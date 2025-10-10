@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  digitalocean-dns-manager:
+    image: yourusername/digitalocean-dns-gui:latest
+    container_name: digitalocean-dns-manager
+    ports:
+      - "5000:5000"
+    environment:
+      # DigitalOcean API Credentials
+      - DO_API_TOKEN=${DO_API_TOKEN}
+      - DO_DNS_ZONE=${DO_DNS_ZONE}
+    
+    # Optionally mount .env file for persistence
+    # volumes:
+    #   - ./.env:/app/.env
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
