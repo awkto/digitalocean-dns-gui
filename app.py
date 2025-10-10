@@ -210,16 +210,33 @@ def get_records():
         
         print(f"Attempting to connect to DigitalOcean DNS Zone: {config['DNS_ZONE']}")
         
-        response = make_do_request('GET', f"/domains/{config['DNS_ZONE']}/records")
+        # Fetch all records with pagination support
+        all_domain_records = []
+        page = 1
+        per_page = 200  # DigitalOcean allows up to 200 per page
         
-        if response.status_code != 200:
-            error_msg = response.json().get('message', 'Unknown error')
-            return jsonify({'error': f'Failed to fetch records: {error_msg}'}), response.status_code
-        
-        domain_records = response.json().get('domain_records', [])
+        while True:
+            response = make_do_request('GET', f"/domains/{config['DNS_ZONE']}/records?page={page}&per_page={per_page}")
+            
+            if response.status_code != 200:
+                error_msg = response.json().get('message', 'Unknown error')
+                return jsonify({'error': f'Failed to fetch records: {error_msg}'}), response.status_code
+            
+            response_data = response.json()
+            domain_records = response_data.get('domain_records', [])
+            all_domain_records.extend(domain_records)
+            
+            # Check if there are more pages
+            links = response_data.get('links', {})
+            pages = links.get('pages', {})
+            
+            if 'next' not in pages:
+                break  # No more pages
+            
+            page += 1
         
         records = []
-        for record in domain_records:
+        for record in all_domain_records:
             record_data = {
                 'name': record.get('name'),
                 'type': record.get('type'),
