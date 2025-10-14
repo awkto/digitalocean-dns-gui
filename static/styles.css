@@ -62,9 +62,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxyge
 .hero-content { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
 .hero-left { display: flex; align-items: center; gap: 1rem; color: white; }
 .icon-badge { display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 1rem;
-    background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); }
+    background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); cursor: default; }
 .icon { width: 1.5rem; height: 1.5rem; }
 .hero-header h1 { font-size: 1.875rem; font-weight: 600; letter-spacing: -0.025em; margin-bottom: 0.5rem; }
+.version-text { font-size: 0.875rem; font-weight: 400; opacity: 0.8; margin-left: 0.5rem; display: none; }
 .zone-badge-container { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem;
     color: rgba(255,255,255,0.9); flex-wrap: wrap; }
 .zone-badge { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem;
@@ -117,7 +118,7 @@ body.dark-mode .btn-action-delete:hover { background: rgba(190,18,60,0.25); }
     border: 1px solid var(--border-color); background: var(--bg-input); font-size: 0.875rem;
     color: var(--text-primary); outline: none; transition: all 0.2s; }
 .search-input:focus { border-color: var(--color-indigo-200); box-shadow: 0 0 0 3px rgba(199,210,254,0.5); }
-.results-count { font-size: 0.875rem; color: var(--text-secondary); }
+.results-count { font-size: 0.875rem; color: var(--text-secondary); margin-left: auto; font-weight: 500; text-align: right; }
 .filter-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .filter-label { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-secondary); }
 .filter-icon { width: 1rem; height: 1rem; }

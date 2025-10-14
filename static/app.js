@@ -24,10 +24,36 @@ const darkModeToggle = document.getElementById('darkModeToggle');
 const moonIcon = document.getElementById('moonIcon');
 const sunIcon = document.getElementById('sunIcon');
 const settingsBtn = document.getElementById('settingsBtn');
+const versionToggle = document.getElementById('versionToggle');
+const versionText = document.getElementById('versionText');
 
 // Store all records and selected types
 let allRecords = [];
 let selectedTypes = new Set();
+
+// Load and display version
+async function loadVersion() {
+    try {
+        const response = await fetch('/version.json');
+        const data = await response.json();
+        if (versionText && data.version) {
+            versionText.textContent = `v${data.version}`;
+        }
+    } catch (error) {
+        console.error('Failed to load version:', error);
+    }
+}
+
+// Toggle version visibility
+function toggleVersion() {
+    if (versionText) {
+        if (versionText.style.display === 'none' || !versionText.style.display) {
+            versionText.style.display = 'inline';
+        } else {
+            versionText.style.display = 'none';
+        }
+    }
+}
 
 // Check configuration status
 async function checkConfigStatus() {
@@ -83,6 +109,7 @@ function disableDarkMode() {
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     initDarkMode();
+    loadVersion();
     
     // Always attach settings button listener first, so it works even in SETUP MODE
     if (settingsBtn) {
@@ -92,6 +119,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Always attach dark mode toggle
     if (darkModeToggle) {
         darkModeToggle.addEventListener('click', toggleDarkMode);
+    }
+    
+    // Attach version toggle
+    if (versionToggle) {
+        versionToggle.addEventListener('click', toggleVersion);
     }
     
     // Check if Azure credentials are configured
@@ -464,7 +496,8 @@ function applyFilters() {
     
     // Update counts
     recordCount.textContent = allRecords.length;
-    resultsCount.textContent = filteredRecords.length;
+    const recordWord = filteredRecords.length === 1 ? 'Record' : 'Records';
+    resultsCount.textContent = `${filteredRecords.length} ${recordWord}`;
     
     // Display filtered records
     displayRecords(filteredRecords);
