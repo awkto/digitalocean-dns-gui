@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+from flasgger import Swagger
 from dotenv import load_dotenv, set_key
 import os
 import json
@@ -10,6 +11,52 @@ load_dotenv()
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
+
+# Swagger configuration
+swagger_config = {
+    "headers": [],
+    "specs": [
+        {
+            "endpoint": 'apispec',
+            "route": '/apispec.json',
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/apidocs/"
+}
+
+swagger_template = {
+    "swagger": "2.0",
+    "info": {
+        "title": "DigitalOcean DNS Manager API",
+        "description": "API for managing DNS records in DigitalOcean",
+        "version": "1.0.0",
+        "contact": {
+            "name": "DigitalOcean DNS Manager"
+        }
+    },
+    "basePath": "/",
+    "schemes": ["http", "https"],
+    "tags": [
+        {
+            "name": "Health",
+            "description": "Health check and status endpoints"
+        },
+        {
+            "name": "Configuration",
+            "description": "DigitalOcean configuration management"
+        },
+        {
+            "name": "DNS Records",
+            "description": "DNS record management operations"
+        }
+    ]
+}
+
+swagger = Swagger(app, config=swagger_config, template=swagger_template)
 
 # DigitalOcean credentials and configuration (mutable for runtime updates)
 config = {
@@ -90,12 +137,55 @@ def serve_static(path):
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
+    """Health check endpoint
+    ---
+    tags:
+      - Health
+    summary: Check API health status
+    description: Returns the health status of the API and the configured DNS zone
+    responses:
+      200:
+        description: API is healthy
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: healthy
+            zone:
+              type: string
+              example: example.com
+    """
     return jsonify({'status': 'healthy', 'zone': config.get('DNS_ZONE')})
 
 @app.route('/api/config/status', methods=['GET'])
 def config_status():
-    """Check if DigitalOcean configuration is complete"""
+    """Check if DigitalOcean configuration is complete
+    ---
+    tags:
+      - Configuration
+    summary: Get configuration status
+    description: Check if DigitalOcean API credentials and DNS zone are configured
+    responses:
+      200:
+        description: Configuration status
+        schema:
+          type: object
+          properties:
+            configured:
+              type: boolean
+              example: true
+            zone:
+              type: string
+              example: example.com
+      500:
+        description: Server error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         complete = is_config_complete()
         return jsonify({
@@ -107,11 +197,39 @@ def config_status():
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
-    """Get current configuration (with masked token)"""
+    """Get current configuration (with masked token)
+    ---
+    tags:
+      - Configuration
+    summary: Get current configuration
+    description: Retrieve the current DigitalOcean API configuration (token and DNS zone)
+    responses:
+      200:
+        description: Current configuration
+        schema:
+          type: object
+          properties:
+            api_token:
+              type: string
+              example: dop_v1_xxxxxxxxxxxxx
+            dns_zone:
+              type: string
+              example: example.com
+            has_token:
+              type: boolean
+              example: true
+      500:
+        description: Server error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         api_token = config.get('API_TOKEN', '')
         masked_token = api_token if api_token else ''
-        
+
         return jsonify({
             'api_token': masked_token,
             'dns_zone': config.get('DNS_ZONE', ''),
@@ -122,25 +240,78 @@ def get_config():
 
 @app.route('/api/config', methods=['POST'])
 def save_config():
-    """Save DigitalOcean configuration"""
+    """Save DigitalOcean configuration
+    ---
+    tags:
+      - Configuration
+    summary: Save configuration
+    description: Save DigitalOcean API token and DNS zone configuration
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - api_token
+            - dns_zone
+          properties:
+            api_token:
+              type: string
+              example: dop_v1_xxxxxxxxxxxxx
+              description: DigitalOcean API token
+            dns_zone:
+              type: string
+              example: example.com
+              description: DNS zone/domain name
+    responses:
+      200:
+        description: Configuration saved successfully
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: Configuration saved successfully
+            zone:
+              type: string
+              example: example.com
+      400:
+        description: Missing required fields
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Server error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         data = request.json
-        
+
         # Validate required fields
         required_fields = ['api_token', 'dns_zone']
         missing_fields = [field for field in required_fields if not data.get(field)]
-        
+
         if missing_fields:
             return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
-        
+
         # Update configuration
         new_config = {
             'API_TOKEN': data['api_token'],
             'DNS_ZONE': data['dns_zone']
         }
-        
+
         update_config(new_config)
-        
+
         return jsonify({
             'success': True,
             'message': 'Configuration saved successfully',
@@ -152,33 +323,104 @@ def save_config():
 
 @app.route('/api/config/test', methods=['POST'])
 def test_config():
-    """Test DigitalOcean API credentials before saving"""
+    """Test DigitalOcean API credentials before saving
+    ---
+    tags:
+      - Configuration
+    summary: Test API credentials
+    description: Test DigitalOcean API credentials and DNS zone connectivity before saving
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - api_token
+            - dns_zone
+          properties:
+            api_token:
+              type: string
+              example: dop_v1_xxxxxxxxxxxxx
+              description: DigitalOcean API token to test
+            dns_zone:
+              type: string
+              example: example.com
+              description: DNS zone to verify
+    responses:
+      200:
+        description: Connection successful
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: Connection successful! Found 10 DNS records.
+            record_count:
+              type: integer
+              example: 10
+            zone:
+              type: string
+              example: example.com
+      400:
+        description: Missing required fields
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      401:
+        description: Authentication failed
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: Authentication failed. Please check your API token.
+      404:
+        description: DNS zone not found
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Connection error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         data = request.json
-        
+
         # Validate required fields
         required_fields = ['api_token', 'dns_zone']
         missing_fields = [field for field in required_fields if not data.get(field)]
-        
+
         if missing_fields:
             return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
-        
+
         # Try to list records from the domain
         try:
             headers = {
                 'Authorization': f"Bearer {data['api_token']}",
                 'Content-Type': 'application/json'
             }
-            
+
             response = requests.get(
                 f"{DO_API_BASE}/domains/{data['dns_zone']}/records",
                 headers=headers
             )
-            
+
             if response.status_code == 200:
                 records = response.json().get('domain_records', [])
                 record_count = len(records)
-                
+
                 return jsonify({
                     'success': True,
                     'message': f'Connection successful! Found {record_count} DNS records.',
@@ -192,17 +434,73 @@ def test_config():
             else:
                 error_msg = response.json().get('message', 'Unknown error')
                 return jsonify({'error': f'Connection failed: {error_msg}'}), response.status_code
-                
+
         except requests.exceptions.RequestException as req_error:
             return jsonify({'error': f'Connection failed: {str(req_error)}'}), 500
-                
+
     except Exception as e:
         print(f"Error testing configuration: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/records', methods=['GET'])
 def get_records():
-    """Get all DNS records from the zone"""
+    """Get all DNS records from the zone
+    ---
+    tags:
+      - DNS Records
+    summary: List all DNS records
+    description: Retrieve all DNS records from the configured DigitalOcean DNS zone
+    responses:
+      200:
+        description: List of DNS records
+        schema:
+          type: object
+          properties:
+            records:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: www
+                  type:
+                    type: string
+                    example: A
+                  ttl:
+                    type: integer
+                    example: 3600
+                  id:
+                    type: integer
+                    example: 123456789
+                  fqdn:
+                    type: string
+                    example: www.example.com
+                  values:
+                    type: array
+                    items:
+                      type: string
+                    example: ["192.0.2.1"]
+            zone:
+              type: string
+              example: example.com
+      400:
+        description: Configuration incomplete
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Server error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+            details:
+              type: string
+    """
     try:
         # Check if configuration is complete
         if not is_config_complete():
@@ -271,14 +569,76 @@ def get_records():
 
 @app.route('/api/records', methods=['POST'])
 def create_record():
-    """Create a new DNS record"""
+    """Create a new DNS record
+    ---
+    tags:
+      - DNS Records
+    summary: Create a DNS record
+    description: Create a new DNS record in the configured zone
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - name
+            - type
+            - values
+          properties:
+            name:
+              type: string
+              example: www
+              description: Record name (use @ for root domain)
+            type:
+              type: string
+              example: A
+              enum: [A, AAAA, CNAME, MX, TXT, SRV, NS]
+              description: DNS record type
+            ttl:
+              type: integer
+              example: 3600
+              description: Time to live in seconds (default 3600)
+            values:
+              type: array
+              items:
+                type: string
+              example: ["192.0.2.1"]
+              description: Record values (format depends on type)
+    responses:
+      201:
+        description: Record created successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Record created successfully
+            name:
+              type: string
+              example: www
+      400:
+        description: Invalid request or configuration
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Server error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         data = request.json
         record_name = data.get('name')
         record_type = data.get('type')
         ttl = data.get('ttl', 3600)
         values = data.get('values', [])
-        
+
         if not record_name or not record_type or not values:
             return jsonify({'error': 'Missing required fields: name, type, values'}), 400
         
@@ -332,13 +692,87 @@ def create_record():
 
 @app.route('/api/records/<record_type>/<path:record_name>', methods=['PUT'])
 def update_record(record_type, record_name):
-    """Update an existing DNS record"""
+    """Update an existing DNS record
+    ---
+    tags:
+      - DNS Records
+    summary: Update a DNS record
+    description: Update an existing DNS record by type and name
+    parameters:
+      - in: path
+        name: record_type
+        type: string
+        required: true
+        description: DNS record type (A, AAAA, CNAME, MX, TXT, SRV, NS)
+        example: A
+      - in: path
+        name: record_name
+        type: string
+        required: true
+        description: Record name
+        example: www
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - values
+          properties:
+            ttl:
+              type: integer
+              example: 3600
+              description: Time to live in seconds
+            values:
+              type: array
+              items:
+                type: string
+              example: ["192.0.2.1"]
+              description: Updated record values
+            id:
+              type: integer
+              example: 123456789
+              description: Record ID (optional, will be looked up if not provided)
+    responses:
+      200:
+        description: Record updated successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Record updated successfully
+            name:
+              type: string
+              example: www
+      400:
+        description: Invalid request or configuration
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      404:
+        description: Record not found
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Server error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         data = request.json
         ttl = data.get('ttl', 3600)
         values = data.get('values', [])
         record_id = data.get('id')
-        
+
         if not values:
             return jsonify({'error': 'Missing required field: values'}), 400
         
@@ -404,11 +838,69 @@ def update_record(record_type, record_name):
 
 @app.route('/api/records/<record_type>/<path:record_name>', methods=['DELETE'])
 def delete_record(record_type, record_name):
-    """Delete a DNS record"""
+    """Delete a DNS record
+    ---
+    tags:
+      - DNS Records
+    summary: Delete a DNS record
+    description: Delete a DNS record by type and name
+    parameters:
+      - in: path
+        name: record_type
+        type: string
+        required: true
+        description: DNS record type (A, AAAA, CNAME, MX, TXT, SRV, NS)
+        example: A
+      - in: path
+        name: record_name
+        type: string
+        required: true
+        description: Record name
+        example: www
+      - in: query
+        name: id
+        type: integer
+        required: false
+        description: Record ID (optional, will be looked up if not provided)
+        example: 123456789
+    responses:
+      200:
+        description: Record deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Record deleted successfully
+            name:
+              type: string
+              example: www
+      400:
+        description: Configuration incomplete
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      404:
+        description: Record not found
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Server error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         if not is_config_complete():
             return jsonify({'error': 'DigitalOcean configuration is incomplete.'}), 400
-        
+
         # Get record ID from query parameter or find it
         record_id = request.args.get('id')
         
