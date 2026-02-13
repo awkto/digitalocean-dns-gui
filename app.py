@@ -111,7 +111,7 @@ def make_do_request(method, endpoint, data=None):
     """Make a request to DigitalOcean API"""
     url = f"{DO_API_BASE}{endpoint}"
     headers = get_headers()
-    
+
     if method == 'GET':
         response = requests.get(url, headers=headers)
     elif method == 'POST':
@@ -122,8 +122,34 @@ def make_do_request(method, endpoint, data=None):
         response = requests.delete(url, headers=headers)
     else:
         raise ValueError(f"Unsupported HTTP method: {method}")
-    
+
     return response
+
+
+def fetch_all_domain_records():
+    """Fetch all DNS records with pagination (DigitalOcean paginates at 20 by default)."""
+    all_records = []
+    page = 1
+    per_page = 200  # DigitalOcean allows up to 200 per page
+
+    while True:
+        response = make_do_request('GET', f"/domains/{config['DNS_ZONE']}/records?page={page}&per_page={per_page}")
+
+        if response.status_code != 200:
+            return None, response
+
+        response_data = response.json()
+        all_records.extend(response_data.get('domain_records', []))
+
+        links = response_data.get('links', {})
+        pages = links.get('pages', {})
+
+        if 'next' not in pages:
+            break
+
+        page += 1
+
+    return all_records, None
 
 @app.route('/')
 def index():
@@ -412,14 +438,31 @@ def test_config():
                 'Content-Type': 'application/json'
             }
 
-            response = requests.get(
-                f"{DO_API_BASE}/domains/{data['dns_zone']}/records",
-                headers=headers
-            )
+            all_records = []
+            page = 1
+            per_page = 200
+            last_status = None
 
-            if response.status_code == 200:
-                records = response.json().get('domain_records', [])
-                record_count = len(records)
+            while True:
+                response = requests.get(
+                    f"{DO_API_BASE}/domains/{data['dns_zone']}/records?page={page}&per_page={per_page}",
+                    headers=headers
+                )
+                last_status = response.status_code
+
+                if response.status_code != 200:
+                    break
+
+                response_data = response.json()
+                all_records.extend(response_data.get('domain_records', []))
+
+                links = response_data.get('links', {})
+                if 'next' not in links.get('pages', {}):
+                    break
+                page += 1
+
+            if last_status == 200:
+                record_count = len(all_records)
 
                 return jsonify({
                     'success': True,
@@ -427,13 +470,13 @@ def test_config():
                     'record_count': record_count,
                     'zone': data['dns_zone']
                 })
-            elif response.status_code == 401:
+            elif last_status == 401:
                 return jsonify({'error': 'Authentication failed. Please check your API token.'}), 401
-            elif response.status_code == 404:
+            elif last_status == 404:
                 return jsonify({'error': f'DNS zone "{data["dns_zone"]}" not found in your DigitalOcean account.'}), 404
             else:
-                error_msg = response.json().get('message', 'Unknown error')
-                return jsonify({'error': f'Connection failed: {error_msg}'}), response.status_code
+                error_msg = response.json().get('message', 'Unknown error') if response.text else 'Unknown error'
+                return jsonify({'error': f'Connection failed: {error_msg}'}), last_status
 
         except requests.exceptions.RequestException as req_error:
             return jsonify({'error': f'Connection failed: {str(req_error)}'}), 500
@@ -507,32 +550,12 @@ def get_records():
             return jsonify({'error': 'DigitalOcean configuration is incomplete. Please configure your credentials.'}), 400
         
         print(f"Attempting to connect to DigitalOcean DNS Zone: {config['DNS_ZONE']}")
-        
-        # Fetch all records with pagination support
-        all_domain_records = []
-        page = 1
-        per_page = 200  # DigitalOcean allows up to 200 per page
-        
-        while True:
-            response = make_do_request('GET', f"/domains/{config['DNS_ZONE']}/records?page={page}&per_page={per_page}")
-            
-            if response.status_code != 200:
-                error_msg = response.json().get('message', 'Unknown error')
-                return jsonify({'error': f'Failed to fetch records: {error_msg}'}), response.status_code
-            
-            response_data = response.json()
-            domain_records = response_data.get('domain_records', [])
-            all_domain_records.extend(domain_records)
-            
-            # Check if there are more pages
-            links = response_data.get('links', {})
-            pages = links.get('pages', {})
-            
-            if 'next' not in pages:
-                break  # No more pages
-            
-            page += 1
-        
+
+        all_domain_records, err_response = fetch_all_domain_records()
+        if err_response is not None:
+            error_msg = err_response.json().get('message', 'Unknown error')
+            return jsonify({'error': f'Failed to fetch records: {error_msg}'}), err_response.status_code
+
         records = []
         for record in all_domain_records:
             record_data = {
@@ -781,18 +804,17 @@ def update_record(record_type, record_name):
         
         # For DigitalOcean, we need to find the record ID first if not provided
         if not record_id:
-            # Get all records and find the matching one
-            response = make_do_request('GET', f"/domains/{config['DNS_ZONE']}/records")
-            if response.status_code == 200:
-                records = response.json().get('domain_records', [])
-                for rec in records:
+            # Get all records (with pagination) and find the matching one
+            all_records, err_response = fetch_all_domain_records()
+            if all_records is not None:
+                for rec in all_records:
                     if rec.get('name') == record_name and rec.get('type') == record_type:
                         record_id = rec.get('id')
                         break
-            
+
             if not record_id:
                 return jsonify({'error': f'Record {record_name} ({record_type}) not found'}), 404
-        
+
         # Prepare the update data
         update_data = {
             'type': record_type,
@@ -905,18 +927,17 @@ def delete_record(record_type, record_name):
         record_id = request.args.get('id')
         
         if not record_id:
-            # Get all records and find the matching one
-            response = make_do_request('GET', f"/domains/{config['DNS_ZONE']}/records")
-            if response.status_code == 200:
-                records = response.json().get('domain_records', [])
-                for rec in records:
+            # Get all records (with pagination) and find the matching one
+            all_records, err_response = fetch_all_domain_records()
+            if all_records is not None:
+                for rec in all_records:
                     if rec.get('name') == record_name and rec.get('type') == record_type:
                         record_id = rec.get('id')
                         break
-            
+
             if not record_id:
                 return jsonify({'error': f'Record {record_name} ({record_type}) not found'}), 404
-        
+
         # Delete the record
         response = make_do_request('DELETE', f"/domains/{config['DNS_ZONE']}/records/{record_id}")
         
