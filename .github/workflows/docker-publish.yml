@@ -36,6 +36,9 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Building version: ${VERSION}"
 
+      - name: Update version.json
+        run: echo "{\"version\": \"${{ steps.get_version.outputs.version }}\"}" > static/version.json
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
