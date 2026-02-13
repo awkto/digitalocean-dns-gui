@@ -37,7 +37,8 @@ jobs:
           echo "Building version: ${VERSION}"
 
       - name: Update version.json
-        run: echo "{\"version\": \"${{ steps.get_version.outputs.version }}\"}" > static/version.json
+        run: |
+          echo '{"version": "${{ steps.get_version.outputs.version }}"}' > static/version.json
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
