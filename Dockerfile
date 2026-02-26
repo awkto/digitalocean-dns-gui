@@ -11,6 +11,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY app.py .
 COPY static/ ./static/
+COPY VERSION .
+
+# Version: use build arg if provided (CI), otherwise fall back to VERSION file
+ARG APP_VERSION=""
+RUN VERSION="${APP_VERSION:-$(cat VERSION | tr -d '[:space:]')}"; \
+    sed -i "s/__VERSION__/${VERSION}/g" static/index.html
 
 # Create .env file placeholder (will be populated at runtime)
 RUN touch .env

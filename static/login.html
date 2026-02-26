@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - DigitalOcean DNS Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .login-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card-solid);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+        .login-header {
+            padding: 2rem 2rem 1rem;
+            text-align: center;
+        }
+        .login-header .icon-badge {
+            margin: 0 auto 1rem;
+        }
+        .login-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        .login-header p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        .login-body {
+            padding: 1rem 2rem 2rem;
+        }
+        .login-error {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            font-size: 0.875rem;
+            display: none;
+        }
+        body.dark-mode .login-error {
+            background: rgba(220, 38, 38, 0.15);
+            border-color: rgba(220, 38, 38, 0.3);
+            color: #fca5a5;
+        }
+        .login-body .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .login-body .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        .login-body .btn-primary {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="icon-badge">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                    </svg>
+                </div>
+                <h1>DigitalOcean DNS Manager</h1>
+                <p>Enter your admin token to continue</p>
+            </div>
+            <div class="login-body">
+                <div class="login-error" id="loginError"></div>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="tokenInput">Admin Token</label>
+                        <input type="password" id="tokenInput" class="form-input" required
+                               placeholder="Enter your admin token" autofocus>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="loginBtn">Login</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode support
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+
+        const loginForm = document.getElementById('loginForm');
+        const tokenInput = document.getElementById('tokenInput');
+        const loginError = document.getElementById('loginError');
+        const loginBtn = document.getElementById('loginBtn');
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loginError.style.display = 'none';
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: tokenInput.value }),
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    loginError.textContent = data.error || 'Invalid token';
+                    loginError.style.display = 'block';
+                    tokenInput.select();
+                }
+            } catch (err) {
+                loginError.textContent = 'Connection error. Please try again.';
+                loginError.style.display = 'block';
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login';
+            }
+        });
+    </script>
+</body>
+</html>
