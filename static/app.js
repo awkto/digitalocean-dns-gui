@@ -1,6 +1,42 @@
 // Use relative URL so it works regardless of hostname/IP
 const API_BASE_URL = '/api';
 
+// Auth check — redirect to login if not authenticated
+async function checkAuth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/status`);
+        const data = await response.json();
+        if (!data.authenticated) {
+            window.location.href = '/login.html';
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        window.location.href = '/login.html';
+        return false;
+    }
+}
+
+// Wrap fetch to intercept 401 responses globally
+const _originalFetch = window.fetch;
+window.fetch = async function(...args) {
+    const response = await _originalFetch.apply(this, args);
+    if (response.status === 401) {
+        const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+        if (!url.includes('/api/auth/')) {
+            window.location.href = '/login.html';
+        }
+    }
+    return response;
+};
+
+// Logout handler
+async function handleLogout() {
+    await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST' });
+    window.location.href = '/login.html';
+}
+
 // DOM Elements
 const zoneName = document.getElementById('zoneName');
 const recordCount = document.getElementById('recordCount');
@@ -30,19 +66,6 @@ const versionText = document.getElementById('versionText');
 // Store all records and selected types
 let allRecords = [];
 let selectedTypes = new Set();
-
-// Load and display version
-async function loadVersion() {
-    try {
-        const response = await fetch('/version.json');
-        const data = await response.json();
-        if (versionText && data.version) {
-            versionText.textContent = `v${data.version}`;
-        }
-    } catch (error) {
-        console.error('Failed to load version:', error);
-    }
-}
 
 // Toggle version visibility
 function toggleVersion() {
@@ -109,7 +132,10 @@ function disableDarkMode() {
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     initDarkMode();
-    loadVersion();
+
+    // Check authentication first
+    const isAuthenticated = await checkAuth();
+    if (!isAuthenticated) return;
 
     // Restore search term from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -123,23 +149,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         searchInput.value = event.state?.q ?? new URLSearchParams(window.location.search).get('q') ?? '';
         applyFilters();
     });
-    
+
+
     // Always attach settings button listener first, so it works even in SETUP MODE
     if (settingsBtn) {
         settingsBtn.addEventListener('click', () => window.location.href = '/settings.html');
     }
-    
+
     // Always attach dark mode toggle
     if (darkModeToggle) {
         darkModeToggle.addEventListener('click', toggleDarkMode);
     }
-    
+
+    // Logout button
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+    }
+
     // Attach version toggle
     if (versionToggle) {
         versionToggle.addEventListener('click', toggleVersion);
     }
-    
-    // Check if Azure credentials are configured
+
+    // Check if credentials are configured
     const isConfigured = await checkConfigStatus();
     if (!isConfigured) {
         return; // Will be redirected to settings page

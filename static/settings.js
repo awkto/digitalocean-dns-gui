@@ -1,6 +1,36 @@
 // Use relative URL so it works regardless of hostname/IP
 const API_BASE_URL = '/api';
 
+// Auth check — redirect to login if not authenticated
+async function checkAuth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/status`);
+        const data = await response.json();
+        if (!data.authenticated) {
+            window.location.href = '/login.html';
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        window.location.href = '/login.html';
+        return false;
+    }
+}
+
+// Wrap fetch to intercept 401 responses globally
+const _originalFetch = window.fetch;
+window.fetch = async function(...args) {
+    const response = await _originalFetch.apply(this, args);
+    if (response.status === 401) {
+        const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+        if (!url.includes('/api/auth/')) {
+            window.location.href = '/login.html';
+        }
+    }
+    return response;
+};
+
 // DOM Elements
 const settingsForm = document.getElementById('settingsForm');
 const testConnectionBtn = document.getElementById('testConnectionBtn');
@@ -19,7 +49,11 @@ const eyeOffIcon = document.getElementById('eyeOffIcon');
 let isSetupMode = false;
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check authentication first
+    const isAuthenticated = await checkAuth();
+    if (!isAuthenticated) return;
+
     loadCurrentConfig();
     
     settingsForm.addEventListener('submit', handleSaveConfig);

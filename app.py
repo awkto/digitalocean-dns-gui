@@ -1,16 +1,52 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 from flasgger import Swagger
 from dotenv import load_dotenv, set_key
 import os
 import json
 import requests
+import secrets
+import hmac
+import hashlib
+from functools import wraps
+from datetime import timedelta
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
+
+# --- Authentication Setup ---
+ADMIN_TOKEN = os.getenv('ADMIN_TOKEN')
+if not ADMIN_TOKEN:
+    ADMIN_TOKEN = secrets.token_hex(16)
+    env_file = '.env'
+    if not os.path.exists(env_file):
+        with open(env_file, 'w') as f:
+            f.write('')
+    set_key(env_file, 'ADMIN_TOKEN', ADMIN_TOKEN)
+    print(f"Generated new ADMIN_TOKEN: {ADMIN_TOKEN}")
+    print("This token has been saved to .env and is required to log in.")
+
+app.secret_key = hashlib.sha256(f"{ADMIN_TOKEN}:flask-session-salt".encode()).hexdigest()
+app.permanent_session_lifetime = timedelta(days=30)
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check Flask session
+        if session.get('authenticated'):
+            return f(*args, **kwargs)
+        # Check Bearer token
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            if hmac.compare_digest(token, ADMIN_TOKEN):
+                return f(*args, **kwargs)
+        return jsonify({'error': 'Authentication required'}), 401
+    return decorated_function
 
 # Swagger configuration
 swagger_config = {
@@ -161,6 +197,74 @@ def serve_static(path):
     """Serve static files"""
     return send_from_directory('static', path)
 
+@app.route('/api/auth/login', methods=['POST'])
+def auth_login():
+    """Login with admin token
+    ---
+    tags:
+      - Authentication
+    summary: Login with admin token
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - token
+          properties:
+            token:
+              type: string
+    responses:
+      200:
+        description: Login successful
+      401:
+        description: Invalid token
+    """
+    data = request.json or {}
+    token = data.get('token', '')
+    if hmac.compare_digest(token, ADMIN_TOKEN):
+        session.permanent = True
+        session['authenticated'] = True
+        return jsonify({'success': True, 'message': 'Login successful'})
+    return jsonify({'error': 'Invalid token'}), 401
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def auth_logout():
+    """Logout and clear session
+    ---
+    tags:
+      - Authentication
+    summary: Logout
+    responses:
+      200:
+        description: Logged out
+    """
+    session.clear()
+    return jsonify({'success': True, 'message': 'Logged out'})
+
+
+@app.route('/api/auth/status', methods=['GET'])
+def auth_status():
+    """Check authentication status
+    ---
+    tags:
+      - Authentication
+    summary: Check if currently authenticated
+    responses:
+      200:
+        description: Authentication status
+    """
+    authenticated = bool(session.get('authenticated'))
+    if not authenticated:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            authenticated = hmac.compare_digest(token, ADMIN_TOKEN)
+    return jsonify({'authenticated': authenticated})
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint
@@ -185,6 +289,7 @@ def health_check():
     return jsonify({'status': 'healthy', 'zone': config.get('DNS_ZONE')})
 
 @app.route('/api/config/status', methods=['GET'])
+@login_required
 def config_status():
     """Check if DigitalOcean configuration is complete
     ---
@@ -222,6 +327,7 @@ def config_status():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/config', methods=['GET'])
+@login_required
 def get_config():
     """Get current configuration (with masked token)
     ---
@@ -265,6 +371,7 @@ def get_config():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/config', methods=['POST'])
+@login_required
 def save_config():
     """Save DigitalOcean configuration
     ---
@@ -348,6 +455,7 @@ def save_config():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/config/test', methods=['POST'])
+@login_required
 def test_config():
     """Test DigitalOcean API credentials before saving
     ---
@@ -486,6 +594,7 @@ def test_config():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/records', methods=['GET'])
+@login_required
 def get_records():
     """Get all DNS records from the zone
     ---
@@ -591,6 +700,7 @@ def get_records():
         return jsonify({'error': str(e), 'details': error_details}), 500
 
 @app.route('/api/records', methods=['POST'])
+@login_required
 def create_record():
     """Create a new DNS record
     ---
@@ -714,6 +824,7 @@ def create_record():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/records/<record_type>/<path:record_name>', methods=['PUT'])
+@login_required
 def update_record(record_type, record_name):
     """Update an existing DNS record
     ---
@@ -859,6 +970,7 @@ def update_record(record_type, record_name):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/records/<record_type>/<path:record_name>', methods=['DELETE'])
+@login_required
 def delete_record(record_type, record_name):
     """Delete a DNS record
     ---
