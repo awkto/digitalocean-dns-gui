@@ -89,6 +89,38 @@
             padding: 0.75rem 1.5rem;
             font-size: 1rem;
         }
+        .settings-divider {
+            margin: 2rem 0;
+            border: none;
+            border-top: 1px solid var(--border-color);
+        }
+        .token-field {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .token-field .form-input {
+            flex: 1;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.8rem;
+            letter-spacing: 0.02em;
+        }
+        .token-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .alert-warning {
+            background: #fffbeb;
+            border-color: #fde68a;
+            color: #92400e;
+        }
+        body.dark-mode .alert-warning {
+            background: rgba(146, 64, 14, 0.15);
+            border-color: rgba(146, 64, 14, 0.3);
+            color: #fcd34d;
+        }
     </style>
 </head>
 <body>
@@ -115,6 +147,46 @@
                     </div>
                     <div id="successMessage" class="alert alert-success" style="display: none;"></div>
                     <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
+
+                    <!-- API Token section (always visible, loads async) -->
+                    <div id="apiTokenSection" style="display: none;">
+                        <div class="form-section">
+                            <h2>🔑 API Token</h2>
+                            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                                Use this token to authenticate API requests from scripts or automation tools.
+                                Pass it as a <code>Bearer</code> token in the <code>Authorization</code> header.
+                            </p>
+                            <div class="token-field">
+                                <input type="password" id="apiTokenDisplay" class="form-input" readonly
+                                       placeholder="Loading...">
+                                <button type="button" id="toggleApiTokenBtn" class="btn btn-secondary" title="Show/hide token">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    Show
+                                </button>
+                            </div>
+                            <div class="token-actions">
+                                <button type="button" id="copyApiTokenBtn" class="btn btn-secondary">
+                                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                    </svg>
+                                    Copy Token
+                                </button>
+                                <button type="button" id="regenerateApiTokenBtn" class="btn btn-secondary">
+                                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                    Regenerate
+                                </button>
+                            </div>
+                            <small class="form-help" style="margin-top: 0.5rem; display: block;">
+                                Example: <code>curl -H "Authorization: Bearer &lt;token&gt;" http://localhost:5000/api/records</code>
+                            </small>
+                        </div>
+                        <hr class="settings-divider">
+                    </div>
 
                     <form id="settingsForm">
                         <div class="form-section">
