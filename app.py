@@ -11,8 +11,12 @@ import hmac
 from functools import wraps
 from datetime import timedelta
 
-# Load environment variables
-load_dotenv()
+# Persistent state lives in /app/data so the directory can be volume-mounted
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+ENV_FILE = os.path.join(DATA_DIR, '.env')
+
+# Load environment variables from data/.env (falls back to process env if absent)
+load_dotenv(ENV_FILE)
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -26,22 +30,23 @@ _auth = {
 }
 
 def _ensure_env_file():
-    if not os.path.exists('.env'):
-        with open('.env', 'w') as f:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if not os.path.exists(ENV_FILE):
+        with open(ENV_FILE, 'w') as f:
             f.write('')
 
 # Generate API_TOKEN if missing
 if not _auth['api_token']:
     _auth['api_token'] = secrets.token_hex(32)
     _ensure_env_file()
-    set_key('.env', 'API_TOKEN', _auth['api_token'])
+    set_key(ENV_FILE, 'API_TOKEN', _auth['api_token'])
     print(f"Generated API_TOKEN for script access (visible in Settings).")
 
 # Generate SESSION_SECRET if missing
 if not _auth['session_secret']:
     _auth['session_secret'] = secrets.token_hex(32)
     _ensure_env_file()
-    set_key('.env', 'SESSION_SECRET', _auth['session_secret'])
+    set_key(ENV_FILE, 'SESSION_SECRET', _auth['session_secret'])
 
 app.secret_key = _auth['session_secret']
 app.permanent_session_lifetime = timedelta(days=30)
@@ -142,14 +147,10 @@ def update_config(new_config):
     API_TOKEN = config['API_TOKEN']
     DNS_ZONE = config['DNS_ZONE']
     
-    # Save to .env file
-    env_file = '.env'
-    if not os.path.exists(env_file):
-        with open(env_file, 'w') as f:
-            f.write('')
-    
-    set_key(env_file, 'DO_API_TOKEN', config['API_TOKEN'])
-    set_key(env_file, 'DO_DNS_ZONE', config['DNS_ZONE'])
+    # Save to data/.env
+    _ensure_env_file()
+    set_key(ENV_FILE, 'DO_API_TOKEN', config['API_TOKEN'])
+    set_key(ENV_FILE, 'DO_DNS_ZONE', config['DNS_ZONE'])
 
 # DigitalOcean API helper functions
 def get_headers():
@@ -264,7 +265,7 @@ def auth_setup():
 
     _auth['password_hash'] = generate_password_hash(password)
     _ensure_env_file()
-    set_key('.env', 'ADMIN_PASSWORD_HASH', _auth['password_hash'])
+    set_key(ENV_FILE, 'ADMIN_PASSWORD_HASH', _auth['password_hash'])
 
     session.permanent = True
     session['authenticated'] = True
@@ -373,7 +374,7 @@ def regenerate_api_token():
     """
     _auth['api_token'] = secrets.token_hex(32)
     _ensure_env_file()
-    set_key('.env', 'API_TOKEN', _auth['api_token'])
+    set_key(ENV_FILE, 'API_TOKEN', _auth['api_token'])
     return jsonify({'success': True, 'api_token': _auth['api_token']})
 
 
