@@ -11,9 +11,8 @@ services:
       - DO_API_TOKEN=${DO_API_TOKEN}
       - DO_DNS_ZONE=${DO_DNS_ZONE}
     
-    # Optionally mount .env file for persistence
-    # volumes:
-    #   - ./.env:/app/.env
+    volumes:
+      - ./data:/app/data
     
     restart: unless-stopped
     
