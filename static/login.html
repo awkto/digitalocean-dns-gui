@@ -58,7 +58,7 @@
             color: #fca5a5;
         }
         .login-body .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
         .login-body .form-group label {
             display: block;
@@ -72,6 +72,46 @@
             padding: 0.75rem;
             font-size: 1rem;
         }
+        .setup-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        body.dark-mode .setup-badge {
+            background: rgba(30, 64, 175, 0.2);
+            border-color: rgba(30, 64, 175, 0.4);
+            color: #93c5fd;
+        }
+        .password-field {
+            position: relative;
+        }
+        .password-field input {
+            padding-right: 2.75rem;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 0.625rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0.25rem;
+            display: flex;
+            align-items: center;
+        }
+        .password-toggle:hover {
+            color: var(--text-primary);
+        }
     </style>
 </head>
 <body>
@@ -84,15 +124,57 @@
                     </svg>
                 </div>
                 <h1>DigitalOcean DNS Manager</h1>
-                <p>Enter your admin token to continue</p>
+                <p id="loginSubtitle">Loading...</p>
             </div>
             <div class="login-body">
                 <div class="login-error" id="loginError"></div>
-                <form id="loginForm">
+
+                <!-- Setup form (first run) -->
+                <form id="setupForm" style="display: none;">
+                    <span class="setup-badge">First-time setup</span>
                     <div class="form-group">
-                        <label for="tokenInput">Admin Token</label>
-                        <input type="password" id="tokenInput" class="form-input" required
-                               placeholder="Enter your admin token" autofocus>
+                        <label for="newPassword">Admin Password</label>
+                        <div class="password-field">
+                            <input type="password" id="newPassword" class="form-input" required
+                                   placeholder="At least 8 characters" autofocus minlength="8">
+                            <button type="button" class="password-toggle" data-target="newPassword" title="Show/hide">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <div class="password-field">
+                            <input type="password" id="confirmPassword" class="form-input" required
+                                   placeholder="Repeat your password" minlength="8">
+                            <button type="button" class="password-toggle" data-target="confirmPassword" title="Show/hide">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="setupBtn">Create Password &amp; Login</button>
+                </form>
+
+                <!-- Login form -->
+                <form id="loginForm" style="display: none;">
+                    <div class="form-group">
+                        <label for="passwordInput">Password</label>
+                        <div class="password-field">
+                            <input type="password" id="passwordInput" class="form-input" required
+                                   placeholder="Enter your password" autofocus>
+                            <button type="button" class="password-toggle" data-target="passwordInput" title="Show/hide">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary" id="loginBtn">Login</button>
                 </form>
@@ -102,43 +184,119 @@
 
     <script>
         // Dark mode support
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'dark') {
+        if (localStorage.getItem('theme') === 'dark') {
             document.body.classList.add('dark-mode');
         }
 
-        const loginForm = document.getElementById('loginForm');
-        const tokenInput = document.getElementById('tokenInput');
+        const subtitle = document.getElementById('loginSubtitle');
         const loginError = document.getElementById('loginError');
-        const loginBtn = document.getElementById('loginBtn');
+        const setupForm = document.getElementById('setupForm');
+        const loginForm = document.getElementById('loginForm');
 
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        // Password show/hide toggles
+        document.querySelectorAll('.password-toggle').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const input = document.getElementById(btn.dataset.target);
+                input.type = input.type === 'password' ? 'text' : 'password';
+            });
+        });
+
+        function showError(msg) {
+            loginError.textContent = msg;
+            loginError.style.display = 'block';
+        }
+
+        function hideError() {
             loginError.style.display = 'none';
-            loginBtn.disabled = true;
-            loginBtn.textContent = 'Logging in...';
+        }
+
+        // Determine which form to show
+        (async () => {
+            try {
+                const res = await fetch('/api/auth/setup-required');
+                const data = await res.json();
+                if (data.required) {
+                    subtitle.textContent = 'Create an admin password to get started';
+                    setupForm.style.display = 'block';
+                    document.getElementById('newPassword').focus();
+                } else {
+                    subtitle.textContent = 'Enter your password to continue';
+                    loginForm.style.display = 'block';
+                    document.getElementById('passwordInput').focus();
+                }
+            } catch {
+                subtitle.textContent = 'Could not connect to server';
+                showError('Connection error. Please refresh and try again.');
+            }
+        })();
+
+        // Setup form submit
+        setupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+            const password = document.getElementById('newPassword').value;
+            const confirm = document.getElementById('confirmPassword').value;
+
+            if (password !== confirm) {
+                showError('Passwords do not match');
+                return;
+            }
+            if (password.length < 8) {
+                showError('Password must be at least 8 characters');
+                return;
+            }
+
+            const btn = document.getElementById('setupBtn');
+            btn.disabled = true;
+            btn.textContent = 'Setting up...';
 
             try {
-                const response = await fetch('/api/auth/login', {
+                const res = await fetch('/api/auth/setup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: tokenInput.value }),
+                    body: JSON.stringify({ password }),
                 });
-                const data = await response.json();
-
-                if (response.ok) {
+                const data = await res.json();
+                if (res.ok) {
                     window.location.href = '/';
                 } else {
-                    loginError.textContent = data.error || 'Invalid token';
-                    loginError.style.display = 'block';
-                    tokenInput.select();
+                    showError(data.error || 'Setup failed');
                 }
-            } catch (err) {
-                loginError.textContent = 'Connection error. Please try again.';
-                loginError.style.display = 'block';
+            } catch {
+                showError('Connection error. Please try again.');
             } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'Login';
+                btn.disabled = false;
+                btn.textContent = 'Create Password & Login';
+            }
+        });
+
+        // Login form submit
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+            const password = document.getElementById('passwordInput').value;
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.textContent = 'Logging in...';
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    window.location.href = '/';
+                } else {
+                    showError(data.error || 'Invalid password');
+                    document.getElementById('passwordInput').select();
+                }
+            } catch {
+                showError('Connection error. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Login';
             }
         });
     </script>
