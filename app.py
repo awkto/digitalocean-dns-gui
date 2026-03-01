@@ -1019,6 +1019,7 @@ def update_record(record_type, record_name):
         ttl = data.get('ttl', 3600)
         values = data.get('values', [])
         record_id = data.get('id')
+        new_name = data.get('name', record_name)
 
         if not values:
             return jsonify({'error': 'Missing required field: values'}), 400
@@ -1042,7 +1043,7 @@ def update_record(record_type, record_name):
         # Prepare the update data
         update_data = {
             'type': record_type,
-            'name': record_name,
+            'name': new_name,
             'ttl': ttl
         }
         
@@ -1074,7 +1075,7 @@ def update_record(record_type, record_name):
         response = make_do_request('PUT', f"/domains/{config['DNS_ZONE']}/records/{record_id}", update_data)
         
         if response.status_code == 200:
-            return jsonify({'message': 'Record updated successfully', 'name': record_name})
+            return jsonify({'message': 'Record updated successfully', 'name': new_name})
         else:
             error_msg = response.json().get('message', 'Unknown error')
             return jsonify({'error': f'Failed to update record: {error_msg}'}), response.status_code
