@@ -373,7 +373,6 @@ function editRecord(name, type, ttl, values, id) {
     document.getElementById('editRecordName').value = name;
     document.getElementById('editRecordType').value = type;
     document.getElementById('editRecordId').value = id;
-    document.getElementById('editRecordNameDisplay').value = name;
     document.getElementById('editRecordTypeDisplay').value = type;
     document.getElementById('editRecordTTL').value = ttl;
     document.getElementById('editRecordValues').value = values.join('\n');
@@ -385,26 +384,31 @@ function editRecord(name, type, ttl, values, id) {
 async function handleEditRecord(e) {
     e.preventDefault();
     
-    const name = document.getElementById('editRecordName').value;
+    const newName = document.getElementById('editRecordName').value.trim();
     const type = document.getElementById('editRecordType').value;
     const id = document.getElementById('editRecordId').value;
     const ttl = parseInt(document.getElementById('editRecordTTL').value);
     const valuesText = document.getElementById('editRecordValues').value.trim();
-    
+
     const values = valuesText.split('\n').map(v => v.trim()).filter(v => v.length > 0);
-    
+
+    if (!newName) {
+        showError('Please enter a record name');
+        return;
+    }
+
     if (values.length === 0) {
         showError('Please enter at least one value');
         return;
     }
-    
+
     try {
-        const response = await fetch(`${API_BASE_URL}/records/${type}/${name}`, {
+        const response = await fetch(`${API_BASE_URL}/records/${type}/${newName}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ ttl, values, id }),
+            body: JSON.stringify({ ttl, values, id, name: newName }),
         });
         
         const data = await response.json();
