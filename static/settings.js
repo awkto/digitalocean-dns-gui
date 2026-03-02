@@ -65,6 +65,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('toggleApiTokenBtn').addEventListener('click', toggleApiTokenVisibility);
     document.getElementById('copyApiTokenBtn').addEventListener('click', copyApiToken);
     document.getElementById('regenerateApiTokenBtn').addEventListener('click', regenerateApiToken);
+
+    // Change password controls
+    document.getElementById('changePasswordBtn').addEventListener('click', handleChangePassword);
+    document.getElementById('changePasswordSection').style.display = 'block';
+
+    // Password visibility toggles
+    document.querySelectorAll('.toggle-password-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const input = document.getElementById(btn.dataset.target);
+            input.type = input.type === 'password' ? 'text' : 'password';
+        });
+    });
 });
 
 // Toggle token visibility
@@ -304,6 +316,60 @@ async function copyApiToken() {
         setTimeout(() => { btn.innerHTML = original; }, 2000);
     } catch {
         showError('Could not copy to clipboard');
+    }
+}
+
+async function handleChangePassword() {
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+
+    hideMessages();
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+        showError('Please fill in all password fields');
+        return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+        showError('New passwords do not match');
+        return;
+    }
+
+    if (newPassword.length < 8) {
+        showError('New password must be at least 8 characters');
+        return;
+    }
+
+    const btn = document.getElementById('changePasswordBtn');
+    try {
+        btn.disabled = true;
+        btn.textContent = 'Changing...';
+
+        const res = await fetch(`${API_BASE_URL}/auth/change-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            showSuccess('Password changed successfully');
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmNewPassword').value = '';
+        } else {
+            showError(data.error || 'Failed to change password');
+        }
+    } catch (error) {
+        showError(`Failed to change password: ${error.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            Change Password`;
     }
 }
 
