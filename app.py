@@ -378,6 +378,56 @@ def regenerate_api_token():
     return jsonify({'success': True, 'api_token': _auth['api_token']})
 
 
+@app.route('/api/auth/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """Change the admin password
+    ---
+    tags:
+      - Authentication
+    summary: Change admin password
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required:
+            - current_password
+            - new_password
+          properties:
+            current_password:
+              type: string
+            new_password:
+              type: string
+    responses:
+      200:
+        description: Password changed successfully
+      400:
+        description: Validation error
+      401:
+        description: Current password is incorrect
+    """
+    data = request.get_json()
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+
+    if not current_password or not new_password:
+        return jsonify({'error': 'Current password and new password are required'}), 400
+
+    if not check_password_hash(_auth['password_hash'], current_password):
+        return jsonify({'error': 'Current password is incorrect'}), 401
+
+    if len(new_password) < 8:
+        return jsonify({'error': 'New password must be at least 8 characters'}), 400
+
+    new_hash = generate_password_hash(new_password)
+    _auth['password_hash'] = new_hash
+    _ensure_env_file()
+    set_key(ENV_FILE, 'ADMIN_PASSWORD_HASH', new_hash)
+
+    return jsonify({'success': True, 'message': 'Password changed successfully'})
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint
