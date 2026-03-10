@@ -949,16 +949,20 @@ def create_record():
         }
         
         # Handle different record types
-        if record_type in ['A', 'AAAA', 'CNAME', 'TXT', 'NS']:
+        if record_type in ['A', 'AAAA', 'TXT']:
+            record_data['data'] = values[0]
+        elif record_type in ['CNAME', 'NS']:
             if len(values) > 1 and record_type == 'CNAME':
                 return jsonify({'error': 'CNAME records can only have one value'}), 400
-            record_data['data'] = values[0]
+            val = values[0]
+            record_data['data'] = val if val.endswith('.') else val + '.'
         elif record_type == 'MX':
             # MX format: "priority exchange"
             parts = values[0].split(' ', 1)
             if len(parts) == 2:
                 record_data['priority'] = int(parts[0])
-                record_data['data'] = parts[1]
+                exchange = parts[1]
+                record_data['data'] = exchange if exchange.endswith('.') else exchange + '.'
             else:
                 return jsonify({'error': 'MX record must be in format: "priority exchange"'}), 400
         elif record_type == 'SRV':
@@ -968,12 +972,13 @@ def create_record():
                 record_data['priority'] = int(parts[0])
                 record_data['weight'] = int(parts[1])
                 record_data['port'] = int(parts[2])
-                record_data['data'] = parts[3]
+                target = parts[3]
+                record_data['data'] = target if target.endswith('.') else target + '.'
             else:
                 return jsonify({'error': 'SRV record must be in format: "priority weight port target"'}), 400
         else:
             return jsonify({'error': f'Unsupported record type: {record_type}'}), 400
-        
+
         # Create the record via DigitalOcean API
         response = make_do_request('POST', f"/domains/{config['DNS_ZONE']}/records", record_data)
         
@@ -1098,15 +1103,19 @@ def update_record(record_type, record_name):
         }
         
         # Handle different record types
-        if record_type in ['A', 'AAAA', 'CNAME', 'TXT', 'NS']:
+        if record_type in ['A', 'AAAA', 'TXT']:
+            update_data['data'] = values[0]
+        elif record_type in ['CNAME', 'NS']:
             if len(values) > 1 and record_type == 'CNAME':
                 return jsonify({'error': 'CNAME records can only have one value'}), 400
-            update_data['data'] = values[0]
+            val = values[0]
+            update_data['data'] = val if val.endswith('.') else val + '.'
         elif record_type == 'MX':
             parts = values[0].split(' ', 1)
             if len(parts) == 2:
                 update_data['priority'] = int(parts[0])
-                update_data['data'] = parts[1]
+                exchange = parts[1]
+                update_data['data'] = exchange if exchange.endswith('.') else exchange + '.'
             else:
                 return jsonify({'error': 'MX record must be in format: "priority exchange"'}), 400
         elif record_type == 'SRV':
@@ -1115,7 +1124,8 @@ def update_record(record_type, record_name):
                 update_data['priority'] = int(parts[0])
                 update_data['weight'] = int(parts[1])
                 update_data['port'] = int(parts[2])
-                update_data['data'] = parts[3]
+                target = parts[3]
+                update_data['data'] = target if target.endswith('.') else target + '.'
             else:
                 return jsonify({'error': 'SRV record must be in format: "priority weight port target"'}), 400
         else:
