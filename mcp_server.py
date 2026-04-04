@@ -553,6 +553,9 @@ def register_mcp_routes(app, auth_dict):
 
     @app.route("/mcp/sse", methods=["GET"])
     def mcp_sse():
+        from app import is_mcp_enabled
+        if not is_mcp_enabled():
+            return jsonify({"error": "MCP is not enabled. Enable it in Settings or set MCP_ENABLED=true"}), 404
         if not _validate_bearer_token(request, auth_dict):
             return jsonify({"error": "Authentication required"}), 401
 
@@ -585,6 +588,9 @@ def register_mcp_routes(app, auth_dict):
 
     @app.route("/mcp/messages", methods=["POST"])
     def mcp_messages():
+        from app import is_mcp_enabled
+        if not is_mcp_enabled():
+            return jsonify({"error": "MCP is not enabled. Enable it in Settings or set MCP_ENABLED=true"}), 404
         if not _validate_bearer_token(request, auth_dict):
             return jsonify({"error": "Authentication required"}), 401
 

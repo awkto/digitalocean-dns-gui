@@ -1237,12 +1237,60 @@ def delete_record(record_type, record_name):
         return jsonify({'error': str(e)}), 500
 
 # ---------------------------------------------------------------------------
-# MCP (Model Context Protocol) integration — enabled with MCP_ENABLED=true
+# MCP (Model Context Protocol) integration
 # ---------------------------------------------------------------------------
-if os.getenv('MCP_ENABLED', '').lower() in ('true', '1', 'yes'):
-    from mcp_server import register_mcp_routes
-    register_mcp_routes(app, _auth)
-    print("MCP server enabled — SSE at /mcp/sse, docs at /mcpdocs")
+
+def is_mcp_enabled():
+    """Check if MCP is enabled via env var or saved config."""
+    return os.getenv('MCP_ENABLED', '').lower() in ('true', '1', 'yes')
+
+
+@app.route('/api/config/mcp', methods=['GET'])
+@login_required
+def get_mcp_config():
+    """Get MCP configuration status
+    ---
+    tags:
+      - Configuration
+    summary: Get MCP enabled state
+    responses:
+      200:
+        description: MCP configuration
+    """
+    return jsonify({'enabled': is_mcp_enabled()})
+
+
+@app.route('/api/config/mcp', methods=['POST'])
+@login_required
+def save_mcp_config():
+    """Save MCP configuration
+    ---
+    tags:
+      - Configuration
+    summary: Enable or disable MCP
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+    responses:
+      200:
+        description: MCP configuration saved
+    """
+    data = request.json or {}
+    enabled = data.get('enabled', False)
+    _ensure_env_file()
+    set_key(ENV_FILE, 'MCP_ENABLED', 'true' if enabled else 'false')
+    os.environ['MCP_ENABLED'] = 'true' if enabled else 'false'
+    return jsonify({'success': True, 'enabled': enabled})
+
+
+from mcp_server import register_mcp_routes
+register_mcp_routes(app, _auth)
 
 
 if __name__ == '__main__':

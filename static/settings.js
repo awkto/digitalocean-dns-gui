@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     loadCurrentConfig();
     loadApiToken();
+    loadMcpConfig();
 
     document.getElementById('saveConfigBtn').addEventListener('click', handleSaveConfig);
     document.getElementById('testConnectionBtn').addEventListener('click', handleTestConnection);
@@ -46,6 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('copyApiTokenBtn').addEventListener('click', copyApiToken);
     document.getElementById('regenerateApiTokenBtn').addEventListener('click', regenerateApiToken);
     document.getElementById('changePasswordBtn').addEventListener('click', handleChangePassword);
+    document.getElementById('mcpEnabledToggle').addEventListener('change', handleMcpToggle);
 });
 
 function switchPanel(panelId) {
@@ -170,6 +172,43 @@ async function handleChangePassword() {
             document.getElementById('confirmNewPassword').value = '';
         } else showError(data.error || 'Failed to change password');
     } catch (e) { showError(`Failed: ${e.message}`); }
+}
+
+async function loadMcpConfig() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/config/mcp`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const toggle = document.getElementById('mcpEnabledToggle');
+        const label = document.getElementById('mcpStatusLabel');
+        toggle.checked = data.enabled;
+        label.textContent = data.enabled ? 'Enabled' : 'Disabled';
+    } catch {}
+}
+
+async function handleMcpToggle() {
+    const toggle = document.getElementById('mcpEnabledToggle');
+    const label = document.getElementById('mcpStatusLabel');
+    const enabled = toggle.checked;
+    try {
+        hideMessages();
+        const res = await fetch(`${API_BASE_URL}/config/mcp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            label.textContent = data.enabled ? 'Enabled' : 'Disabled';
+            showSuccess(`MCP server ${data.enabled ? 'enabled' : 'disabled'}.`);
+        } else {
+            toggle.checked = !enabled;
+            showError(data.error || 'Failed to update MCP setting');
+        }
+    } catch (e) {
+        toggle.checked = !enabled;
+        showError(`Failed to update MCP setting: ${e.message}`);
+    }
 }
 
 function showSuccess(msg) {
