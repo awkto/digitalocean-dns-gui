@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 COPY static/ ./static/
 COPY VERSION .
+COPY mcp_server.py .
 
 # Version: use build arg if provided (CI), otherwise fall back to VERSION file
 ARG APP_VERSION=""
