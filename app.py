@@ -1236,16 +1236,25 @@ def delete_record(record_type, record_name):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ---------------------------------------------------------------------------
+# MCP (Model Context Protocol) integration — enabled with MCP_ENABLED=true
+# ---------------------------------------------------------------------------
+if os.getenv('MCP_ENABLED', '').lower() in ('true', '1', 'yes'):
+    from mcp_server import register_mcp_routes
+    register_mcp_routes(app, _auth)
+    print("MCP server enabled — SSE at /mcp/sse, docs at /mcpdocs")
+
+
 if __name__ == '__main__':
     # Check if environment variables are set and log a warning if not
     required_vars = ['DO_API_TOKEN', 'DO_DNS_ZONE']
     missing_vars = [var for var in required_vars if not os.getenv(var)]
-    
+
     if missing_vars:
         print(f"WARNING: Missing environment variables: {', '.join(missing_vars)}")
         print("The application will start, but you need to configure DigitalOcean credentials in Settings.")
         print(f"Starting DigitalOcean DNS Manager (unconfigured)")
     else:
         print(f"Starting DigitalOcean DNS Manager for zone: {DNS_ZONE}")
-    
+
     app.run(debug=True, host='0.0.0.0', port=5000)

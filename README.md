@@ -267,6 +267,60 @@ The backend provides the following REST API endpoints:
 | PUT | `/api/records/<type>/<name>` | Update a DNS record |
 | DELETE | `/api/records/<type>/<name>` | Delete a DNS record |
 
+## MCP (Model Context Protocol) Integration
+
+This app includes a built-in MCP server for AI agent integration (e.g., Claude Code). MCP allows AI assistants to manage DNS records programmatically.
+
+### Enabling MCP
+
+Set the `MCP_ENABLED` environment variable:
+
+```bash
+docker run -d -p 5000:5000 \
+  -e MCP_ENABLED=true \
+  -e DO_API_TOKEN=your-api-token \
+  -e DO_DNS_ZONE=your-domain.com \
+  digitalocean-dns-manager
+```
+
+### MCP Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /mcp/sse` | SSE transport (requires Bearer token) |
+| `POST /mcp/messages` | JSON-RPC messages (requires Bearer token) |
+| `GET /mcpdocs` | Interactive MCP tool documentation |
+
+### MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_records` | List all DNS records in the zone |
+| `create_record` | Create a new DNS record |
+| `update_record` | Update an existing DNS record |
+| `delete_record` | Delete a DNS record |
+| `health_check` | Check API health and zone info |
+
+### Claude Code Configuration
+
+Add to your Claude Code MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "dodns": {
+      "type": "url",
+      "url": "https://your-dodns-host/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_TOKEN"
+      }
+    }
+  }
+}
+```
+
+The MCP server uses the same API token as the REST API.
+
 ## Project Structure
 
 ```
@@ -277,6 +331,7 @@ digitalocean-dns-gui/
 │   ├── app.js                   # Main page JavaScript
 │   ├── settings.js              # Settings page JavaScript
 │   └── styles.css               # Modern CSS with dark mode
+├── mcp_server.py                # MCP server integration
 ├── app.py                       # Flask backend application
 ├── test_connection.py           # Connection test script
 ├── requirements.txt             # Python dependencies
